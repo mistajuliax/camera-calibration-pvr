@@ -48,10 +48,7 @@ def make_poly(coeffs):
 def poly_norm(poly):
     """Normalizes a given polynomial"""
     f = poly[-1]
-    result = []
-    for coeff in poly:
-        result.append(coeff / f)
-    return result
+    return [coeff / f for coeff in poly]
 
 def poly_sub(a, b):
     """Subtract the two polynomials"""
@@ -62,34 +59,25 @@ def poly_sub(a, b):
         _a[i] = a[i]
     for i in range(len(b)):
         _b[i] = b[i]
-    result = []
-    for i in range(n):
-        result.append(_a[i] - _b[i])
-    return result
+    return [_a[i] - _b[i] for i in range(n)]
 
 def poly_scale(poly, factor):
     """Normalizes a given polynomial"""
     f = poly[-1]
-    result = []
-    for coeff in poly:
-        result.append(coeff * factor)
-    return result
+    return [coeff * factor for coeff in poly]
 
 def poly_reduce(poly):
     """Removes leading coefficients that are zero"""
     result = []
     for i in range(len(poly) - 1, -1, -1):
-        if poly[i] != 0 or len(result) > 0:
+        if poly[i] != 0 or result:
             result.append(poly[i])
     result.reverse()
     return result
 
 def poly_derivative(poly):
     """Calculates the derivative of the polynomial"""
-    result = []
-    for i in range(1, len(poly)):
-        result.append(i * poly[i])
-    return result
+    return [i * poly[i] for i in range(1, len(poly))]
 
 def poly_eval(poly, x):
     """Evaluate the polynomial"""
@@ -153,7 +141,7 @@ def find_poly_roots(poly, initial_guess = 0.0, limit = 0.00001, max_iterations =
     """Find all roots of the given polynomial"""
     solutions = []
     # Find solutions numerically for n > 0, split them off until n = 2
-    for q in range(poly_order(poly) - 2):
+    for _ in range(poly_order(poly) - 2):
         x = find_poly_root(poly, initial_guess, limit, max_iterations)
         if not x:
             break
@@ -170,8 +158,7 @@ def find_poly_roots(poly, initial_guess = 0.0, limit = 0.00001, max_iterations =
         if d == 0:
             solutions.append(-b / (2 * a))
         elif d > 0:
-            solutions.append((- b + sqrt(d)) / (2 * a))
-            solutions.append((- b - sqrt(d)) / (2 * a))
+            solutions.extend(((- b + sqrt(d)) / (2 * a), (- b - sqrt(d)) / (2 * a)))
     return solutions
 
 ### Linear Algebra functions #####################################################
@@ -499,7 +486,7 @@ def get_background_image_data(context):
         # Get the visible background images with view axis 'top'
         bkg_images_top = []
         for img in bkg_images:
-            if (img.view_axis == "TOP" or img.view_axis == "ALL") and img.show_background_image:
+            if img.view_axis in ["TOP", "ALL"] and img.show_background_image:
                 bkg_images_top.append(img)
         # Check the number of images
         if len(bkg_images_top) != 1:
@@ -508,8 +495,8 @@ def get_background_image_data(context):
             for img in bkg_images:
                 if img.view_axis == "TOP" and img.show_background_image:
                     bkg_images_top.append(img)
-            if len(bkg_images_top) != 1:
-                return None
+        if len(bkg_images_top) != 1:
+            return None
         # Get the background image properties
         img = bkg_images_top[0]
     offx = img.offset_x
@@ -562,8 +549,7 @@ def is_to_the_right(a, b, c):
 def is_convex(pa, pb, pc, pd):
     """Checks whether the given quadrilateral corners form a convex quadrilateral."""
     # Check, which side each point is on
-    to_the_right = []
-    to_the_right.append(is_to_the_right(pa, pb, pc))
+    to_the_right = [is_to_the_right(pa, pb, pc)]
     to_the_right.append(is_to_the_right(pb, pc, pd))
     to_the_right.append(is_to_the_right(pc, pd, pa))
     to_the_right.append(is_to_the_right(pd, pa, pb))
@@ -605,21 +591,20 @@ def set_camera_transformation(camera_obj, translation, rotation):
     camera_obj.rotation_euler = rotation
 
 def get_vertical_mode_matrix(is_vertical, camera_rotation):
-    if is_vertical:
-    # Get the up direction of the camera
-        up_vec = mathutils.Vector((0.0, 1.0, 0.0))
-        up_vec.rotate(camera_rotation)
-        # Decide around which axis to rotate
-        vert_mode_rotate_x = abs(up_vec[0]) < abs(up_vec[1])
-        # Create rotation matrix
-        if vert_mode_rotate_x:
-            vert_angle = pi / 2 if up_vec[1] > 0 else -pi / 2
-            return mathutils.Matrix().Rotation(vert_angle, 3, "X")
-        else:
-            vert_angle = pi / 2 if up_vec[0] < 0 else -pi / 2
-            return mathutils.Matrix().Rotation(vert_angle, 3, "Y")
-    else:
+    if not is_vertical:
         return mathutils.Matrix().Identity(3)
+    # Get the up direction of the camera
+    up_vec = mathutils.Vector((0.0, 1.0, 0.0))
+    up_vec.rotate(camera_rotation)
+    # Decide around which axis to rotate
+    vert_mode_rotate_x = abs(up_vec[0]) < abs(up_vec[1])
+    # Create rotation matrix
+    if vert_mode_rotate_x:
+        vert_angle = pi / 2 if up_vec[1] > 0 else -pi / 2
+        return mathutils.Matrix().Rotation(vert_angle, 3, "X")
+    else:
+        vert_angle = pi / 2 if up_vec[0] < 0 else -pi / 2
+        return mathutils.Matrix().Rotation(vert_angle, 3, "Y")
 
 def update_scene(camera, cam_pos, cam_rot, is_vertical, scene, img_width, img_height, object_name, coords, size_factor):
     """Updates the scene by moving the camera and creating a new rectangle"""
@@ -668,7 +653,12 @@ class CameraCalibration_F_PR_S_Operator(bpy.types.Operator):
         # Get the currently selected object
         obj = bpy.context.object
         # Check whether a mesh with 4 vertices in one polygon is selected
-        if not obj.data.name in bpy.data.meshes or not len(obj.data.vertices) == 4 or not len(obj.data.polygons) == 1 or not len(obj.data.polygons[0].vertices) == 4:
+        if (
+            obj.data.name not in bpy.data.meshes
+            or len(obj.data.vertices) != 4
+            or len(obj.data.polygons) != 1
+            or len(obj.data.polygons[0].vertices) != 4
+        ):
             self.report({'ERROR'}, "Selected object must be a mesh with 4 vertices in 1 polygon.")
             return {'CANCELLED'}
         # Get the vertex coordinates and transform them to get the global coordinates, then project to 2d
@@ -685,13 +675,11 @@ class CameraCalibration_F_PR_S_Operator(bpy.types.Operator):
             self.report({'ERROR'}, "Edges of the input rectangle must not be parallel.")
             return {'CANCELLED'}
         print("Vertices:", pa, pb, pc, pd)
-        # Get the background image data
-        img_data = get_background_image_data(bpy.context)
-        if not img_data:
+        if img_data := get_background_image_data(bpy.context):
+            offx, offy, rot, scale, flipx, flipy, w, h = img_data
+        else:
             self.report({'ERROR'}, "Exactly 1 visible background image required in top view.")
             return {'CANCELLED'}
-        else:
-            offx, offy, rot, scale, flipx, flipy, w, h = img_data
         # Scale is the horizontal dimension. If in portrait mode, use the vertical dimension.
         if h > w:
             scale = scale / w * h
@@ -709,7 +697,7 @@ class CameraCalibration_F_PR_S_Operator(bpy.types.Operator):
         # Set extrinsic camera parameters and add a new rectangle
         update_scene(cam_obj, cam_pos, cam_rot, self.vertical_property, scene, w, h, obj.name, coords, size_factor)
         # Switch to the active camera
-        if not bpy.context.space_data.region_3d.view_perspective == "CAMERA":
+        if bpy.context.space_data.region_3d.view_perspective != "CAMERA":
             bpy.ops.view3d.viewnumpad(type="CAMERA")
         return {'FINISHED'}
 
@@ -735,15 +723,24 @@ class CameraCalibration_FX_PR_V_Operator(bpy.types.Operator):
         # Get the currently selected object
         obj = bpy.context.object
         # Check whether it is a mesh with 5 vertices, 4 in a polygon, 1 dangling at an edge
-        if not obj.data.name in bpy.data.meshes or not len(obj.data.vertices) == 5 or not len(obj.data.polygons) == 1 or not len(obj.data.polygons[0].vertices) == 4 or not len(obj.data.edges) == 5:
+        if (
+            obj.data.name not in bpy.data.meshes
+            or len(obj.data.vertices) != 5
+            or len(obj.data.polygons) != 1
+            or len(obj.data.polygons[0].vertices) != 4
+            or len(obj.data.edges) != 5
+        ):
             self.report({'ERROR'}, "Selected object must be a mesh with 4 vertices in 1 polygon and one dangling vertex.")
             return {'CANCELLED'}
-        # Get the edge that is not part of the polygon
-        dangling_edge = None
-        for edge in obj.data.edges:
-            if not edge.key in obj.data.polygons[0].edge_keys:
-                dangling_edge = edge
-                break
+        dangling_edge = next(
+            (
+                edge
+                for edge in obj.data.edges
+                if edge.key not in obj.data.polygons[0].edge_keys
+            ),
+            None,
+        )
+
         print("Dangling edge:", dangling_edge.key)
         # Get the index to the attached and dangling vertex
         if dangling_edge.key[0] in obj.data.polygons[0].vertices:
@@ -771,13 +768,11 @@ class CameraCalibration_FX_PR_V_Operator(bpy.types.Operator):
             self.report({'ERROR'}, "Exactly one opposing edge pair of the input rectangle must be parallel.")
             return {'CANCELLED'}
         print("Vertices:", pa, pb, pc, pd, pe, pf)
-        # Get the background image data
-        img_data = get_background_image_data(bpy.context)
-        if not img_data:
+        if img_data := get_background_image_data(bpy.context):
+            offx, offy, rot, scale, flipx, flipy, w, h = img_data
+        else:
             self.report({'ERROR'}, "Exactly 1 visible background image required in top view.")
             return {'CANCELLED'}
-        else:
-            offx, offy, rot, scale, flipx, flipy, w, h = img_data
         # Scale is the horizontal dimension. If in portrait mode, use the vertical dimension.
         if h > w:
             scale = scale / w * h
@@ -794,7 +789,7 @@ class CameraCalibration_FX_PR_V_Operator(bpy.types.Operator):
         # Set extrinsic camera parameters and add a new rectangle
         update_scene(cam_obj, cam_pos, cam_rot, self.vertical_property, scene, w, h, obj.name, coords, size_factor)
         # Switch to the active camera
-        if not bpy.context.space_data.region_3d.view_perspective == "CAMERA":
+        if bpy.context.space_data.region_3d.view_perspective != "CAMERA":
             bpy.ops.view3d.viewnumpad(type="CAMERA")
         return {'FINISHED'}
 
